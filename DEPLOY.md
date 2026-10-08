@@ -42,7 +42,7 @@ curl -F image=@examples/owl.png -F n=50 -F format=svg \
 | Setting | Value | Why |
 | --- | --- | --- |
 | Upload size | 4 MB | Vercel's request body limit is 4.5 MB |
-| Shapes per request | 200 | Keeps work within the time budget |
+| Shapes per request | 500 | Requests that exceed the time budget return the shapes placed so far |
 | Output size | 64-1024 px | Larger images cost more memory and time |
 | Work budget | 50 s | Function limit is 60 s (`vercel.json`); Hobby allows up to 300 s |
 

@@ -17,7 +17,7 @@ import (
 
 const (
 	maxUploadBytes = 4 << 20 // stay under Vercel's 4.5 MB request body limit
-	maxShapes      = 200
+	maxShapes      = 500
 	maxOutputSize  = 1024
 	analysisSize   = 256              // input is downscaled to this before the search
 	workBudget     = 50 * time.Second // leaves headroom under the 60 s function limit
