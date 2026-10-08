@@ -4,124 +4,104 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Primitive Pictures</title>
-  <style>
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-    body { max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.4; }
-    h1 { font-size: 1.6rem; margin-bottom: .2rem; }
-    p.lead { margin-top: 0; opacity: .75; }
-    form { display: grid; gap: .8rem; padding: 1rem; border: 1px solid #8884; border-radius: 10px; }
-    label { display: grid; gap: .25rem; font-size: .95rem; }
-    input[type=range] { width: 100%; }
-    button { padding: .6rem 1rem; font-size: 1rem; border-radius: 8px; border: 0; cursor: pointer; }
-    button:disabled { opacity: .5; cursor: wait; }
-    #status { min-height: 1.2rem; font-size: .9rem; }
-    #result { margin-top: 1rem; text-align: center; }
-    #result img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #8884; }
-    .links { margin-top: .5rem; display: flex; gap: 1rem; justify-content: center; }
-  </style>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <h1>Primitive Pictures</h1>
-  <p class="lead">Recreate a photo from simple geometric shapes. Upload a PNG or JPEG (max 4 MB).</p>
+  <header class="top">
+    <div>
+      <h1>Primitive Pictures</h1>
+      <p>Rebuild a photo from simple shapes, one run at a time. Each run improves the picture until it stops getting better.</p>
+    </div>
+  </header>
 
-  <form id="form">
-    <label>Image
-      <input type="file" name="image" accept="image/png,image/jpeg" required>
-    </label>
+  <main class="layout">
+    <section class="card" aria-labelledby="new-title">
+      <h2 id="new-title">New picture</h2>
+      <form id="newJob">
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="image/*" required>
+          <span class="drop-title">Choose an image</span>
+          <span class="drop-hint" id="fileHint">PNG, JPEG, or other common formats. Large files are shrunk automatically.</span>
+        </label>
 
-    <label>Shapes: <output id="nOut">50</output>
-      <input type="range" name="n" min="1" max="500" value="50" id="n">
-    </label>
+        <label class="field">
+          <span>Shapes per run <output id="nOut">150</output></span>
+          <input type="range" id="n" name="n" min="50" max="300" step="10" value="150">
+        </label>
 
-    <label>Shape type
-      <select name="mode">
-        <option value="1" selected>Triangles</option>
-        <option value="0">Mix of all shapes (combo)</option>
-        <option value="2">Rectangles</option>
-        <option value="3">Ellipses</option>
-        <option value="4">Circles</option>
-        <option value="5">Rotated rectangles</option>
-        <option value="6">Beziers</option>
-        <option value="7">Rotated ellipses</option>
-        <option value="8">Polygons</option>
-      </select>
-    </label>
+        <label class="field">
+          <span>Shape type</span>
+          <select id="mode">
+            <option value="1" selected>Triangles</option>
+            <option value="0">Mix of all shapes</option>
+            <option value="2">Rectangles</option>
+            <option value="3">Ellipses</option>
+            <option value="4">Circles</option>
+            <option value="5">Rotated rectangles</option>
+            <option value="6">Beziers</option>
+            <option value="7">Rotated ellipses</option>
+            <option value="8">Polygons</option>
+          </select>
+        </label>
 
-    <label>Output size (pixels, longest side)
-      <select name="size">
-        <option value="256">256</option>
-        <option value="512" selected>512</option>
-        <option value="1024">1024</option>
-      </select>
-    </label>
+        <label class="field">
+          <span>Output size</span>
+          <select id="size">
+            <option value="256">256 px</option>
+            <option value="512" selected>512 px</option>
+            <option value="1024">1024 px</option>
+          </select>
+        </label>
 
-    <label>Download format
-      <select name="format">
-        <option value="png" selected>PNG</option>
-        <option value="svg">SVG (vector, scales cleanly)</option>
-        <option value="json">JSON (shape list)</option>
-      </select>
-    </label>
+        <button type="submit" class="primary" id="start">Start</button>
+      </form>
+      <p class="note">Each run takes up to 50 seconds. Keep this tab open while a picture is running. Progress is saved in this browser, so you can continue later.</p>
+    </section>
 
-    <button type="submit" id="go">Create picture</button>
-    <div id="status" role="status"></div>
-  </form>
+    <section class="card job" aria-labelledby="job-title">
+      <div id="jobEmpty" class="empty">
+        <h2 id="job-title">Results</h2>
+        <p>Start a picture or pick one from your history.</p>
+      </div>
 
-  <div id="result"></div>
+      <div id="jobView" hidden>
+        <div class="job-head">
+          <div>
+            <h2 id="jobName"></h2>
+            <p class="meta" id="jobMeta"></p>
+          </div>
+          <span class="pill" id="jobStatus"></span>
+        </div>
 
-  <script>
-    const form = document.getElementById('form');
-    const nInput = document.getElementById('n');
-    const nOut = document.getElementById('nOut');
-    const statusEl = document.getElementById('status');
-    const resultEl = document.getElementById('result');
-    const go = document.getElementById('go');
+        <div class="bar" id="bar"><span id="barFill"></span></div>
+        <p class="status-line" id="statusLine"></p>
 
-    nInput.addEventListener('input', () => { nOut.textContent = nInput.value; });
+        <figure class="stage">
+          <img id="mainImg" alt="Current picture">
+        </figure>
 
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const data = new FormData(form);
-      const format = data.get('format');
+        <div class="actions">
+          <button type="button" id="pause" hidden>Pause after this run</button>
+          <button type="button" id="resume" hidden class="primary">Continue</button>
+          <a id="download" class="button" download="primitive.png" hidden>Download PNG</a>
+          <button type="button" id="remove" class="danger">Delete</button>
+        </div>
 
-      go.disabled = true;
-      resultEl.innerHTML = '';
-      statusEl.textContent = 'Working… larger shape counts take longer.';
+        <h3>Runs</h3>
+        <div class="timeline" id="timeline"></div>
 
-      const started = performance.now();
-      try {
-        const res = await fetch('/api/primitive', { method: 'POST', body: data });
-        if (!res.ok) {
-          throw new Error((await res.text()).trim() || `Request failed (${res.status})`);
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const placed = res.headers.get('X-Shapes-Placed');
-        const requested = res.headers.get('X-Shapes-Requested');
-        const secs = ((performance.now() - started) / 1000).toFixed(1);
+        <h3>Log</h3>
+        <ol class="log" id="log"></ol>
+      </div>
+    </section>
 
-        const note = placed && requested && placed !== requested
-          ? ` Stopped early at ${placed} of ${requested} shapes (time limit).`
-          : '';
-        statusEl.textContent = `Done in ${secs}s.${note}`;
+    <aside class="card history" aria-labelledby="history-title">
+      <h2 id="history-title">History</h2>
+      <p class="note">Saved in this browser.</p>
+      <ul id="history" class="history-list"></ul>
+    </aside>
+  </main>
 
-        const ext = format === 'json' ? 'json' : format;
-        const linkHtml = `<a href="${url}" download="primitive.${ext}">Download ${ext.toUpperCase()}</a>`;
-        if (format === 'json') {
-          resultEl.innerHTML = `<div class="links">${linkHtml}</div>`;
-        } else {
-          const img = document.createElement('img');
-          img.src = url;
-          img.alt = 'Generated picture';
-          resultEl.append(img);
-          resultEl.insertAdjacentHTML('beforeend', `<div class="links">${linkHtml}</div>`);
-        }
-      } catch (err) {
-        statusEl.textContent = 'Error: ' + err.message;
-      } finally {
-        go.disabled = false;
-      }
-    });
-  </script>
+  <script src="/app.js"></script>
 </body>
 </html>
