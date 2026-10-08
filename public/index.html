@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Primitive Pictures</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.4; }
+    h1 { font-size: 1.6rem; margin-bottom: .2rem; }
+    p.lead { margin-top: 0; opacity: .75; }
+    form { display: grid; gap: .8rem; padding: 1rem; border: 1px solid #8884; border-radius: 10px; }
+    label { display: grid; gap: .25rem; font-size: .95rem; }
+    input[type=range] { width: 100%; }
+    button { padding: .6rem 1rem; font-size: 1rem; border-radius: 8px; border: 0; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #status { min-height: 1.2rem; font-size: .9rem; }
+    #result { margin-top: 1rem; text-align: center; }
+    #result img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #8884; }
+    .links { margin-top: .5rem; display: flex; gap: 1rem; justify-content: center; }
+  </style>
+</head>
+<body>
+  <h1>Primitive Pictures</h1>
+  <p class="lead">Recreate a photo from simple geometric shapes. Upload a PNG or JPEG (max 4 MB).</p>
+
+  <form id="form">
+    <label>Image
+      <input type="file" name="image" accept="image/png,image/jpeg" required>
+    </label>
+
+    <label>Shapes: <output id="nOut">50</output>
+      <input type="range" name="n" min="1" max="200" value="50" id="n">
+    </label>
+
+    <label>Shape type
+      <select name="mode">
+        <option value="1" selected>Triangles</option>
+        <option value="0">Mix of all shapes (combo)</option>
+        <option value="2">Rectangles</option>
+        <option value="3">Ellipses</option>
+        <option value="4">Circles</option>
+        <option value="5">Rotated rectangles</option>
+        <option value="6">Beziers</option>
+        <option value="7">Rotated ellipses</option>
+        <option value="8">Polygons</option>
+      </select>
+    </label>
+
+    <label>Output size (pixels, longest side)
+      <select name="size">
+        <option value="256">256</option>
+        <option value="512" selected>512</option>
+        <option value="1024">1024</option>
+      </select>
+    </label>
+
+    <label>Download format
+      <select name="format">
+        <option value="png" selected>PNG</option>
+        <option value="svg">SVG (vector, scales cleanly)</option>
+        <option value="json">JSON (shape list)</option>
+      </select>
+    </label>
+
+    <button type="submit" id="go">Create picture</button>
+    <div id="status" role="status"></div>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    const form = document.getElementById('form');
+    const nInput = document.getElementById('n');
+    const nOut = document.getElementById('nOut');
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+    const go = document.getElementById('go');
+
+    nInput.addEventListener('input', () => { nOut.textContent = nInput.value; });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const format = data.get('format');
+
+      go.disabled = true;
+      resultEl.innerHTML = '';
+      statusEl.textContent = 'Working… larger shape counts take longer.';
+
+      const started = performance.now();
+      try {
+        const res = await fetch('/api/primitive', { method: 'POST', body: data });
+        if (!res.ok) {
+          throw new Error((await res.text()).trim() || `Request failed (${res.status})`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const placed = res.headers.get('X-Shapes-Placed');
+        const requested = res.headers.get('X-Shapes-Requested');
+        const secs = ((performance.now() - started) / 1000).toFixed(1);
+
+        const note = placed && requested && placed !== requested
+          ? ` Stopped early at ${placed} of ${requested} shapes (time limit).`
+          : '';
+        statusEl.textContent = `Done in ${secs}s.${note}`;
+
+        const ext = format === 'json' ? 'json' : format;
+        const linkHtml = `<a href="${url}" download="primitive.${ext}">Download ${ext.toUpperCase()}</a>`;
+        if (format === 'json') {
+          resultEl.innerHTML = `<div class="links">${linkHtml}</div>`;
+        } else {
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = 'Generated picture';
+          resultEl.append(img);
+          resultEl.insertAdjacentHTML('beforeend', `<div class="links">${linkHtml}</div>`);
+        }
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+      } finally {
+        go.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
