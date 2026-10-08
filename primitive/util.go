@@ -84,14 +84,33 @@ func SaveGIF(path string, frames []image.Image, delay, lastDelay int) error {
 	return gif.EncodeAll(file, &g)
 }
 
+// imageMagickBinary returns the ImageMagick command to use. ImageMagick 6
+// ships "convert"; ImageMagick 7 ships "magick" (and often no "convert").
+func imageMagickBinary() (string, error) {
+	if _, err := exec.LookPath("convert"); err == nil {
+		return "convert", nil
+	}
+	if _, err := exec.LookPath("magick"); err == nil {
+		return "magick", nil
+	}
+	return "", fmt.Errorf("ImageMagick not found: install it to write GIF output")
+}
+
 func SaveGIFImageMagick(path string, frames []image.Image, delay, lastDelay int) error {
+	bin, err := imageMagickBinary()
+	if err != nil {
+		return err
+	}
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		return err
 	}
+	defer os.RemoveAll(dir)
 	for i, im := range frames {
 		path := filepath.Join(dir, fmt.Sprintf("%06d.png", i))
-		SavePNG(path, im)
+		if err := SavePNG(path, im); err != nil {
+			return err
+		}
 	}
 	args := []string{
 		"-loop", "0",
@@ -101,11 +120,11 @@ func SaveGIFImageMagick(path string, frames []image.Image, delay, lastDelay int)
 		filepath.Join(dir, fmt.Sprintf("%06d.png", len(frames)-1)),
 		path,
 	}
-	cmd := exec.Command("convert", args...)
-	if err := cmd.Run(); err != nil {
-		return err
+	cmd := exec.Command(bin, args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%s failed: %v: %s", bin, err, out)
 	}
-	return os.RemoveAll(dir)
+	return nil
 }
 
 func NumberString(x float64) string {

@@ -19,6 +19,7 @@ import (
 var (
 	Input      string
 	Outputs    flagArray
+	JSONOutput string
 	Background string
 	Configs    shapeConfigArray
 	Alpha      int
@@ -64,6 +65,7 @@ func (i *shapeConfigArray) Set(value string) error {
 func init() {
 	flag.StringVar(&Input, "i", "", "input image path")
 	flag.Var(&Outputs, "o", "output image path")
+	flag.StringVar(&JSONOutput, "json", "", "write placed shapes as JSON to this path (\"-\" for stdout)")
 	flag.Var(&Configs, "n", "number of primitives")
 	flag.StringVar(&Background, "bg", "", "background color (hex)")
 	flag.IntVar(&Alpha, "a", 128, "alpha value")
@@ -73,6 +75,7 @@ func init() {
 	flag.IntVar(&Workers, "j", 0, "number of parallel workers (default uses all cores)")
 	flag.IntVar(&Nth, "nth", 1, "save every Nth frame (put \"%d\" in path)")
 	flag.IntVar(&Repeat, "rep", 0, "add N extra shapes per iteration with reduced search")
+	flag.Int64Var(&primitive.Seed, "seed", 0, "random seed for reproducible runs (0 = random; use -j 1 for exact repeats)")
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
 }
@@ -95,8 +98,8 @@ func main() {
 	if Input == "" {
 		ok = errorMessage("ERROR: input argument required")
 	}
-	if len(Outputs) == 0 {
-		ok = errorMessage("ERROR: output argument required")
+	if len(Outputs) == 0 && JSONOutput == "" {
+		ok = errorMessage("ERROR: output argument required (-o or -json)")
 	}
 	if len(Configs) == 0 {
 		ok = errorMessage("ERROR: number argument required")
@@ -126,7 +129,11 @@ func main() {
 	}
 
 	// seed random number generator
-	rand.Seed(time.Now().UTC().UnixNano())
+	if primitive.Seed != 0 {
+		rand.Seed(primitive.Seed)
+	} else {
+		rand.Seed(time.Now().UTC().UnixNano())
+	}
 
 	// determine worker count
 	if Workers < 1 {
@@ -203,5 +210,13 @@ func main() {
 				}
 			}
 		}
+	}
+
+	// write the shape list once the run is complete
+	if JSONOutput != "" {
+		data, err := model.JSON()
+		check(err)
+		primitive.Log(1, "writing %s\n", JSONOutput)
+		check(primitive.SaveFile(JSONOutput, string(data)+"\n"))
 	}
 }

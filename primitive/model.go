@@ -1,12 +1,38 @@
 package primitive
 
 import (
+	"encoding/json"
 	"fmt"
 	"image"
+	"math/rand"
 	"strings"
 
 	"github.com/fogleman/gg"
 )
+
+// Seed, when non-zero, makes the search reproducible: worker i uses
+// Seed+i as its random source. For exact repeatability run with one
+// worker, because the order in which parallel workers report can vary.
+var Seed int64
+
+// ShapeRecord is one placed shape in the JSON export.
+type ShapeRecord struct {
+	Index int     `json:"index"`
+	Color string  `json:"color"`
+	Alpha float64 `json:"alpha"`
+	Score float64 `json:"score"`
+	SVG   string  `json:"svg"`
+}
+
+// ModelRecord is the JSON export of a whole run.
+type ModelRecord struct {
+	Width      int           `json:"width"`
+	Height     int           `json:"height"`
+	Scale      float64       `json:"scale"`
+	Background string        `json:"background"`
+	Score      float64       `json:"score"`
+	Shapes     []ShapeRecord `json:"shapes"`
+}
 
 type Model struct {
 	Sw, Sh     int
@@ -49,6 +75,9 @@ func NewModel(target image.Image, background Color, size, numWorkers int) *Model
 	model.Context = model.newContext()
 	for i := 0; i < numWorkers; i++ {
 		worker := NewWorker(model.Target)
+		if Seed != 0 {
+			worker.Rnd = rand.New(rand.NewSource(Seed + int64(i)))
+		}
 		model.Workers = append(model.Workers, worker)
 	}
 	return model
@@ -83,6 +112,11 @@ func (model *Model) Frames(scoreDelta float64) []image.Image {
 	return result
 }
 
+// shapeAttrs returns the SVG fill attributes for a shape's color.
+func shapeAttrs(c Color) string {
+	return fmt.Sprintf("fill=\"#%02x%02x%02x\" fill-opacity=\"%f\"", c.R, c.G, c.B, float64(c.A)/255)
+}
+
 func (model *Model) SVG() string {
 	bg := model.Background
 	var lines []string
@@ -90,14 +124,40 @@ func (model *Model) SVG() string {
 	lines = append(lines, fmt.Sprintf("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" fill=\"#%02x%02x%02x\" />", model.Sw, model.Sh, bg.R, bg.G, bg.B))
 	lines = append(lines, fmt.Sprintf("<g transform=\"scale(%f) translate(0.5 0.5)\">", model.Scale))
 	for i, shape := range model.Shapes {
-		c := model.Colors[i]
-		attrs := "fill=\"#%02x%02x%02x\" fill-opacity=\"%f\""
-		attrs = fmt.Sprintf(attrs, c.R, c.G, c.B, float64(c.A)/255)
-		lines = append(lines, shape.SVG(attrs))
+		lines = append(lines, shape.SVG(shapeAttrs(model.Colors[i])))
 	}
 	lines = append(lines, "</g>")
 	lines = append(lines, "</svg>")
 	return strings.Join(lines, "\n")
+}
+
+// JSON returns the placed shapes as indented JSON, so a run can be stored
+// and re-rendered later without repeating the search. Each shape's svg
+// field is a self-contained element in the same coordinate space as the
+// SVG export; apply "scale" with translate(0.5 0.5) to map it to pixels.
+func (model *Model) JSON() ([]byte, error) {
+	bg := model.Background
+	rec := ModelRecord{
+		Width:      model.Sw,
+		Height:     model.Sh,
+		Scale:      model.Scale,
+		Background: fmt.Sprintf("#%02x%02x%02x", bg.R, bg.G, bg.B),
+		Shapes:     make([]ShapeRecord, 0, len(model.Shapes)),
+	}
+	if n := len(model.Scores); n > 0 {
+		rec.Score = model.Scores[n-1]
+	}
+	for i, shape := range model.Shapes {
+		c := model.Colors[i]
+		rec.Shapes = append(rec.Shapes, ShapeRecord{
+			Index: i,
+			Color: fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B),
+			Alpha: float64(c.A) / 255,
+			Score: model.Scores[i],
+			SVG:   shape.SVG(shapeAttrs(c)),
+		})
+	}
+	return json.MarshalIndent(rec, "", "  ")
 }
 
 func (model *Model) Add(shape Shape, alpha int) {
