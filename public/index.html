@@ -4,104 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Primitive Pictures</title>
-  <link rel="stylesheet" href="/style.css">
+  <meta name="description" content="Turn any photo into a picture made of triangles, circles and other shapes. Runs entirely in your browser. Download as PNG, JPG, SVG, GIF or JSON.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 27L15 5l12 22z' fill='%232d4bff'/%3E%3Ccircle cx='21' cy='12' r='7' fill='%23ffb020' fill-opacity='.85'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <header class="top">
-    <div>
-      <h1>Primitive Pictures</h1>
-      <p>Rebuild a photo from simple shapes, one run at a time. Each run improves the picture until it stops getting better.</p>
-    </div>
+  <a class="skip" href="#app">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="#/" aria-label="Primitive Pictures, home">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+        <path d="M3 27L15 5l12 22z" fill="var(--accent)"/>
+        <circle cx="21" cy="12" r="7" fill="var(--sun)" fill-opacity=".85"/>
+        <rect x="4" y="4" width="9" height="9" rx="1" fill="var(--ink)" fill-opacity=".85" transform="rotate(-12 8 8)"/>
+      </svg>
+      <span>Primitive Pictures</span>
+    </a>
+    <span class="privacy">Runs in your browser. Photos never leave your device.</span>
   </header>
 
-  <main class="layout">
-    <section class="card" aria-labelledby="new-title">
-      <h2 id="new-title">New picture</h2>
-      <form id="newJob">
-        <label class="drop" id="drop">
-          <input type="file" id="file" accept="image/*" required>
-          <span class="drop-title">Choose an image</span>
-          <span class="drop-hint" id="fileHint">PNG, JPEG, or other common formats. Large files are shrunk automatically.</span>
-        </label>
-
-        <label class="field">
-          <span>Shapes per run <output id="nOut">150</output></span>
-          <input type="range" id="n" name="n" min="50" max="300" step="10" value="150">
-        </label>
-
-        <label class="field">
-          <span>Shape type</span>
-          <select id="mode">
-            <option value="1" selected>Triangles</option>
-            <option value="0">Mix of all shapes</option>
-            <option value="2">Rectangles</option>
-            <option value="3">Ellipses</option>
-            <option value="4">Circles</option>
-            <option value="5">Rotated rectangles</option>
-            <option value="6">Beziers</option>
-            <option value="7">Rotated ellipses</option>
-            <option value="8">Polygons</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Output size</span>
-          <select id="size">
-            <option value="256">256 px</option>
-            <option value="512" selected>512 px</option>
-            <option value="1024">1024 px</option>
-          </select>
-        </label>
-
-        <button type="submit" class="primary" id="start">Start</button>
-      </form>
-      <p class="note">Each run takes up to 50 seconds. Keep this tab open while a picture is running. Progress is saved in this browser, so you can continue later.</p>
-    </section>
-
-    <section class="card job" aria-labelledby="job-title">
-      <div id="jobEmpty" class="empty">
-        <h2 id="job-title">Results</h2>
-        <p>Start a picture or pick one from your history.</p>
-      </div>
-
-      <div id="jobView" hidden>
-        <div class="job-head">
-          <div>
-            <h2 id="jobName"></h2>
-            <p class="meta" id="jobMeta"></p>
-          </div>
-          <span class="pill" id="jobStatus"></span>
-        </div>
-
-        <div class="bar" id="bar"><span id="barFill"></span></div>
-        <p class="status-line" id="statusLine"></p>
-
-        <figure class="stage">
-          <img id="mainImg" alt="Current picture">
-        </figure>
-
-        <div class="actions">
-          <button type="button" id="pause" hidden>Pause after this run</button>
-          <button type="button" id="resume" hidden class="primary">Continue</button>
-          <a id="download" class="button" download="primitive.png" hidden>Download PNG</a>
-          <button type="button" id="remove" class="danger">Delete</button>
-        </div>
-
-        <h3>Runs</h3>
-        <div class="timeline" id="timeline"></div>
-
-        <h3>Log</h3>
-        <ol class="log" id="log"></ol>
-      </div>
-    </section>
-
-    <aside class="card history" aria-labelledby="history-title">
-      <h2 id="history-title">History</h2>
-      <p class="note">Saved in this browser.</p>
-      <ul id="history" class="history-list"></ul>
-    </aside>
+  <main id="app" tabindex="-1">
+    <noscript><p class="notice">This app needs JavaScript to turn photos into shapes.</p></noscript>
   </main>
 
-  <script src="/app.js"></script>
+  <footer class="site-footer">
+    Based on the open-source <a href="https://github.com/fogleman/primitive" rel="noopener">primitive</a> algorithm by Michael Fogleman.
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

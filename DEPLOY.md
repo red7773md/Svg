@@ -1,81 +1,57 @@
-# Deploying the web app to Vercel
+# Primitive Pictures (web app)
 
-The web app is a static page (`public/`) plus one Go serverless function
-(`api/primitive.go`). The function reuses the same `primitive` package as the
-command-line tool.
+A static web app. All the work happens in the visitor's browser: the photo is
+never uploaded, and there is no server code to run or pay for.
 
-## Before the first deploy
+- `public/` is the whole site (HTML, CSS and ES modules, no build step)
+- `public/js/engine/` is the shape-search engine (a JavaScript port of the Go
+  algorithm in `primitive/`)
+- `tests/` has Node tests for the engine and the GIF encoder
 
-1. Make the Go module complete. The committed `go.mod` only has the module
-   line, so run this once on a machine with module access:
+## Run it locally
 
-   ```sh
-   go mod tidy
-   go build ./primitive && go vet ./primitive
-   ```
+```sh
+npm start          # serves public/ at http://localhost:8000
+npm test           # engine and GIF tests (the GIF test needs python3 with Pillow)
+```
 
-   Then commit `go.mod` and `go.sum`. Vercel reads dependencies from these
-   files and won't fetch them for you.
+## Deploy to Vercel
 
-2. Check the framework preset. The repo root has the CLI `main.go`, which
-   Vercel may detect as a standalone Go server. In the project settings, set
-   the framework preset to **Other** so only `api/` and `public/` are used.
+The repository is ready as-is: `vercel.json` sets `public` as the output
+directory and skips the build. In the Vercel dashboard import the repository and
+deploy (framework preset **Other**), or run `vercel` from the repo root.
 
-## Deploy
-
-- **Dashboard:** import the Git repository, set the framework to Other, and
-  deploy. Each push to the branch redeploys.
-- **CLI:** `npm i -g vercel`, then run `vercel` in the repo root.
+`vercel.json` also sets a Content-Security-Policy that only allows the site's
+own files plus `blob:` workers and images.
 
 ## How a picture is built
 
-A picture is built in **runs**. Each run is one request that places as many
-shapes as fit in 50 seconds, then returns the image and the full shape list.
-The browser sends that shape list back with the next run, so the picture keeps
-improving. The browser stops when a run improves the score by less than 0.5%,
-or after 12 runs, or at 3000 shapes.
-
-Every run is saved in the browser's IndexedDB, so a picture that was
-interrupted can be continued on a later visit.
-
-Before upload, the browser re-encodes each image as a JPEG of at most 1024 px.
-This removes metadata. If the result is still over 4 MB, it shrinks further and
-logs each step.
-
-## API
-
-`POST /api/primitive` with `multipart/form-data`:
-
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `image` | yes | PNG or JPEG, up to 4 MB |
-| `state` | no | `state` from the previous run's response (JSON). Omit on the first run. |
-| `n` | no | shapes to place this run, 1-300 (default 150) |
-| `mode` | no | 0=combo 1=triangle 2=rect 3=ellipse 4=circle 5=rotatedrect 6=beziers 7=rotatedellipse 8=polygon (default 1) |
-| `alpha` | no | 0-255 (default 128) |
-| `size` | no | output longest side, 64-1024 px (default 512) |
-
-The response is JSON: `image` (base64 PNG), `width`, `height`, `score`
-(lower is better), `placed`, `total`, `requested`, `stoppedEarly`, `seconds`,
-and `state` (send this back on the next run).
-
-Quick check from the command line (first run only):
-
-```sh
-curl -F image=@examples/owl.png -F n=50 \
-  https://<your-deployment>.vercel.app/api/primitive -o run1.json
-```
+1. The photo is re-drawn on a canvas. This removes metadata (location, camera
+   info), applies the camera rotation, flattens transparency, and shrinks it to
+   at most 1600 px on its longest side. Photos over 5 MB are reported in the
+   activity log as they are reduced.
+2. The search runs on a copy of at most 256 px (384 px with "Fine" detail). The
+   result is vector shapes, so the output stays sharp at any size.
+3. Several Web Workers (one per CPU core, up to six) search in parallel. For each
+   shape, every worker tries a share of the hill climbs; the best shape wins and
+   all workers apply it.
+4. The shape list is saved in IndexedDB every 10 shapes or 2.5 seconds, with the
+   shrunk photo. Closing the tab loses almost nothing, and an interrupted
+   picture can be resumed from the history on the home page.
 
 ## Limits
 
-| Setting | Value | Why |
-| --- | --- | --- |
-| Upload size | 4 MB | Vercel's request body limit is 4.5 MB; larger images are re-encoded in the browser |
-| Shapes per run | 300 | Upper bound for one request |
-| Shapes per picture | 3000 | Keeps the saved state and requests a reasonable size |
-| Work per run | 50 s | Function limit is 60 s (`vercel.json`); Hobby allows up to 300 s |
-| Runs per picture | 12 | Stops early when a run improves the score by under 0.5% |
-| Output size | 64-1024 px | Larger images cost more memory and time |
+| Setting | Value |
+| --- | --- |
+| Shapes per picture | 10 to 2,000 (default 500). Defined in `public/js/config.js` |
+| Photo file size | up to 100 MB, up to 200 megapixels |
+| Photo kept in the browser | 1600 px longest side, JPEG |
+| Downloads | PNG/JPG at 1024, 2048 or 4096 px; SVG; GIF (400 px, up to 60 frames); JSON |
 
-If a run runs out of time, the response contains the shapes placed so far, and
-`stoppedEarly` is `true`.
+Pictures are stored per browser. Clearing site data removes them.
+
+## Command-line tool
+
+The original Go command-line tool is unchanged and still lives in `main.go` and
+`primitive/`. This fork adds `-json` (write the shapes as JSON) and `-seed`
+(repeatable runs).

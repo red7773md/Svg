@@ -2,6 +2,8 @@
 
 Reproducing images with geometric primitives.
 
+**Web app:** this fork includes a browser version that runs entirely on the visitor's device. See [DEPLOY.md](DEPLOY.md). The original command-line tool is described below.
+
 ![Example](https://www.michaelfogleman.com/static/primitive/examples/16550611738.200.128.4.5.png)
 
 ### How it Works
